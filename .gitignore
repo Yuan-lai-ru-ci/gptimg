@@ -31,11 +31,3 @@ Thumbs.db
 # Go
 backend/tmp/
 backend/*.exe
-
-# Claude
-.claude/
-
-# Test scripts
-test_image_context.py
-run_test.bat
-test_output/

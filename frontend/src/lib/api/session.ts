@@ -21,6 +21,10 @@ export const sessionApi = {
     return apiClient.get(`/sessions/${id}`)
   },
 
+  update: async (id: string, data: Partial<Session>): Promise<ApiResponse<Session>> => {
+    return apiClient.put(`/sessions/${id}`, data)
+  },
+
   getMessages: async (id: string, limit = 100, offset = 0): Promise<ApiResponse<ImageRecord[]>> => {
     return apiClient.get(`/sessions/${id}/messages`, { params: { limit, offset } })
   },

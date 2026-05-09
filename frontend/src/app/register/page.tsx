@@ -6,7 +6,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-foreground">GPT Image</h1>
-          <p className="text-muted-foreground mt-2">Create an account to get started</p>
+          <p className="text-muted-foreground mt-2">Account creation is managed by the administrator</p>
         </div>
         <div className="bg-card border border-border rounded-2xl p-6">
           <RegisterForm />

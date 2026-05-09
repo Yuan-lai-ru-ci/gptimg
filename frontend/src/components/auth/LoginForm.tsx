@@ -20,7 +20,6 @@ export default function LoginForm() {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     try {
       const res: any = await authApi.login({ email, password })
       setAuth(res.data.token, res.data.user)
@@ -39,41 +38,18 @@ export default function LoginForm() {
           {error}
         </div>
       )}
-
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="your@email.com"
-          required
-        />
+        <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" required />
       </div>
-
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Enter your password"
-          required
-        />
+        <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" required />
       </div>
-
       <Button type="submit" disabled={loading} className="w-full">
         {loading ? 'Logging in...' : 'Login'}
       </Button>
-
-      <p className="text-center text-muted-foreground text-sm">
-        Don&apos;t have an account?{' '}
-        <a href="/register" className="text-foreground hover:underline">
-          Register
-        </a>
-      </p>
+      <p className="text-center text-muted-foreground text-sm">Accounts are issued by the administrator.</p>
     </form>
   )
 }

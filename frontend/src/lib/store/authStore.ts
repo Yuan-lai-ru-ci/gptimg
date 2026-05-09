@@ -33,23 +33,30 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       localStorage.removeItem('access_token')
       localStorage.removeItem('user')
     }
-    set({ token: null, user: null, isAuthenticated: false })
+    set({ token: null, user: null, isAuthenticated: false, isLoading: false })
   },
 
   loadAuth: () => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('access_token')
-      const userStr = localStorage.getItem('user')
-      if (token && userStr) {
-        try {
-          const user = JSON.parse(userStr)
-          set({ token, user, isAuthenticated: true, isLoading: false })
-        } catch {
-          set({ isLoading: false })
-        }
-      } else {
-        set({ isLoading: false })
-      }
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const token = localStorage.getItem('access_token')
+    const userStr = localStorage.getItem('user')
+
+    if (!token || !userStr) {
+      set({ isLoading: false, token: null, user: null, isAuthenticated: false })
+      return
+    }
+
+    try {
+      const user = JSON.parse(userStr)
+      set({ token, user, isAuthenticated: true, isLoading: false })
+      void get().refreshUser()
+    } catch {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('user')
+      set({ isLoading: false, token: null, user: null, isAuthenticated: false })
     }
   },
 
@@ -60,8 +67,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (typeof window !== 'undefined') {
         localStorage.setItem('user', JSON.stringify(user))
       }
-      set({ user })
-    } catch (error) {
+      set({ user, isAuthenticated: true })
+    } catch {
       get().clearAuth()
     }
   },

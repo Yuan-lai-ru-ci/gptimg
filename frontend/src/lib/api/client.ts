@@ -1,8 +1,21 @@
 import axios from 'axios'
+import { withBasePath } from '@/lib/runtime'
+
+function getApiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL
+  }
+
+  if (typeof window !== 'undefined') {
+    return withBasePath('/api/v1').replace('/gptimg/api/v1', '/gptimg-api/api/v1')
+  }
+
+  return 'http://127.0.0.1:8080/api/v1'
+}
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1',
-  timeout: 60000,
+  baseURL: getApiBaseUrl(),
+  timeout: 330000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -18,22 +31,16 @@ apiClient.interceptors.request.use(
     }
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
 apiClient.interceptors.response.use(
-  (response) => {
-    return response.data
-  },
+  (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('user')
-        window.location.href = '/login'
-      }
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('user')
+      window.location.assign(withBasePath('/login'))
     }
     const errData = error.response?.data
     return Promise.reject(new Error(errData?.message || error.message || 'Request failed'))

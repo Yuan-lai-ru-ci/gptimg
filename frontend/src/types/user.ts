@@ -4,6 +4,7 @@ export interface User {
   email: string
   avatar_url?: string
   credits: number
+  quota_limit: number
   role: string
   status: string
   created_at: string
