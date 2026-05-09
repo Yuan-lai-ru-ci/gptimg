@@ -39,52 +39,7 @@ type AuthResponse struct {
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
-	var req RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
-		return
-	}
-
-	existingUser, err := h.userRepo.FindByEmail(req.Email)
-	if err != nil {
-		response.InternalError(c, "Database error")
-		return
-	}
-	if existingUser != nil {
-		response.BadRequest(c, "Email already registered")
-		return
-	}
-
-	passwordHash, err := utils.HashPassword(req.Password)
-	if err != nil {
-		response.InternalError(c, "Failed to hash password")
-		return
-	}
-
-	user := &models.User{
-		Username:     req.Username,
-		Email:        req.Email,
-		PasswordHash: passwordHash,
-		Credits:      100,
-		Role:         "user",
-		Status:       "active",
-	}
-
-	if err := h.userRepo.Create(user); err != nil {
-		response.InternalError(c, "Failed to create user")
-		return
-	}
-
-	token, err := utils.GenerateToken(user, h.cfg.JWTSecret)
-	if err != nil {
-		response.InternalError(c, "Failed to generate token")
-		return
-	}
-
-	response.Success(c, AuthResponse{
-		Token: token,
-		User:  user,
-	})
+	response.Forbidden(c, "Accounts are issued by the administrator")
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {

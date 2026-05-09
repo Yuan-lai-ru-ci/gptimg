@@ -11,12 +11,36 @@ import (
 	"gptimg/internal/repository"
 	"gptimg/internal/utils"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+func normalizeImageSize(size string) string {
+	switch strings.TrimSpace(strings.ToLower(size)) {
+	case "", "auto":
+		return "1024x1024"
+	default:
+		return size
+	}
+}
+
+func normalizeImageQuality(quality string) string {
+	switch strings.TrimSpace(strings.ToLower(quality)) {
+	case "", "auto":
+		return "medium"
+	case "standard":
+		return "medium"
+	case "hd":
+		return "high"
+	default:
+		return quality
+	}
+}
 
 type ImageService struct {
 	configRepo *repository.ConfigRepository
@@ -43,19 +67,29 @@ func NewImageService(
 }
 
 type GenerateImageRequest struct {
-	Prompt    string `json:"prompt" binding:"required"`
-	SessionID string `json:"session_id"`
-	Size      string `json:"size"`
-	Quality   string `json:"quality"`
-	Style     string `json:"style"`
+	Prompt             string           `json:"prompt" form:"prompt" binding:"required"`
+	SessionID          string           `json:"session_id" form:"session_id"`
+	Size               string           `json:"size" form:"size"`
+	Quality            string           `json:"quality" form:"quality"`
+	Style              string           `json:"style" form:"style"`
+	ReferenceImageData []byte           `json:"-" form:"-"`
+	ReferenceImageName string           `json:"-" form:"-"`
+	ReferenceImageType string           `json:"-" form:"-"`
+	ReferenceImages    []ReferenceImage `json:"-" form:"-"`
+}
+
+type ReferenceImage struct {
+	Data        []byte
+	Name        string
+	ContentType string
 }
 
 type ChatGPTImageResponse struct {
 	Created int64 `json:"created"`
 	Data    []struct {
-		URL            string `json:"url"`
-		B64JSON        string `json:"b64_json"`
-		RevisedPrompt  string `json:"revised_prompt"`
+		URL           string `json:"url"`
+		B64JSON       string `json:"b64_json"`
+		RevisedPrompt string `json:"revised_prompt"`
 	} `json:"data"`
 }
 
@@ -71,35 +105,53 @@ func (s *ImageService) GenerateImage(userID int, req *GenerateImageRequest) (*mo
 	}
 
 	creditsNeeded := 1
-	if req.Quality == "hd" {
+	if strings.EqualFold(req.Quality, "hd") || strings.EqualFold(req.Quality, "high") {
 		creditsNeeded = 2
 	}
 
-	if user.Credits < creditsNeeded {
+	isAdmin := strings.EqualFold(user.Role, "admin")
+
+	if !isAdmin && user.Credits < creditsNeeded {
 		return nil, errors.New("insufficient credits")
 	}
 
-	apiConfig, err := s.configRepo.FindActive()
+	apiConfigs, err := s.configRepo.FindActiveConfigs()
 	if err != nil {
 		return nil, err
 	}
-	if apiConfig == nil {
+	if len(apiConfigs) == 0 {
 		return nil, errors.New("no active API configuration found")
 	}
 
-	apiKey, err := utils.DecryptAPIKey(apiConfig.APIKeyEncrypted, s.cfg.EncryptionKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt API key: %w", err)
+	req.Size = normalizeImageSize(req.Size)
+	req.Quality = normalizeImageQuality(req.Quality)
+
+	var (
+		imageURL       string
+		selectedConfig *models.APIConfig
+		lastErr        error
+	)
+
+	for _, apiConfig := range apiConfigs {
+		apiKey, err := utils.DecryptAPIKey(apiConfig.APIKeyEncrypted, s.cfg.EncryptionKey)
+		if err != nil {
+			lastErr = fmt.Errorf("%s: failed to decrypt API key", apiConfig.ConfigName)
+			continue
+		}
+
+		imageURL, _, err = s.callChatGPTAPI(apiConfig.APIBaseURL, apiKey, apiConfig.Model, req)
+		if err == nil {
+			selectedConfig = apiConfig
+			break
+		}
+
+		lastErr = fmt.Errorf("%s: %w", apiConfig.ConfigName, err)
 	}
 
-	if req.Size == "" {
-		req.Size = "1024x1024"
-	}
-	if req.Quality == "" {
-		req.Quality = "standard"
+	if selectedConfig == nil {
+		err = lastErr
 	}
 
-	imageURL, revisedPrompt, err := s.callChatGPTAPI(apiConfig.APIBaseURL, apiKey, apiConfig.Model, req)
 	if err != nil {
 		record := &models.ImageRecord{
 			UserID:       userID,
@@ -108,7 +160,7 @@ func (s *ImageService) GenerateImage(userID int, req *GenerateImageRequest) (*mo
 			Size:         req.Size,
 			Quality:      req.Quality,
 			Style:        req.Style,
-			Model:        apiConfig.Model,
+			Model:        apiConfigs[0].Model,
 			CreditsUsed:  0,
 			Status:       "failed",
 			ErrorMessage: err.Error(),
@@ -142,13 +194,13 @@ func (s *ImageService) GenerateImage(userID int, req *GenerateImageRequest) (*mo
 		UserID:         userID,
 		SessionID:      req.SessionID,
 		Prompt:         req.Prompt,
-		RevisedPrompt:  revisedPrompt,
+		RevisedPrompt:  "",
 		ImageURL:       imageURL,
 		LocalPath:      localPath,
 		Size:           req.Size,
 		Quality:        req.Quality,
 		Style:          req.Style,
-		Model:          apiConfig.Model,
+		Model:          selectedConfig.Model,
 		CreditsUsed:    creditsNeeded,
 		GenerationTime: generationTime,
 		Status:         "success",
@@ -158,9 +210,11 @@ func (s *ImageService) GenerateImage(userID int, req *GenerateImageRequest) (*mo
 		return nil, err
 	}
 
-	newCredits := user.Credits - creditsNeeded
-	if err := s.userRepo.UpdateCredits(userID, newCredits); err != nil {
-		return nil, err
+	if !isAdmin {
+		newCredits := user.Credits - creditsNeeded
+		if err := s.userRepo.UpdateCredits(userID, newCredits); err != nil {
+			return nil, err
+		}
 	}
 
 	today := time.Now().Format("2006-01-02")
@@ -175,6 +229,10 @@ func (s *ImageService) callChatGPTAPI(baseURL, apiKey, model string, req *Genera
 	}
 	if model == "" {
 		model = "gpt-image-2"
+	}
+
+	if len(req.ReferenceImages) > 0 || len(req.ReferenceImageData) > 0 {
+		return s.callChatGPTImageEditAPI(baseURL, apiKey, model, req)
 	}
 
 	requestBody := map[string]interface{}{
@@ -203,7 +261,7 @@ func (s *ImageService) callChatGPTAPI(baseURL, apiKey, model string, req *Genera
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{Timeout: 330 * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return "", "", err
@@ -234,6 +292,107 @@ func (s *ImageService) callChatGPTAPI(baseURL, apiKey, model string, req *Genera
 		return "b64:" + item.B64JSON, item.RevisedPrompt, nil
 	}
 
+	if item.URL != "" {
+		return item.URL, item.RevisedPrompt, nil
+	}
+
+	return "", "", errors.New("API returned no image URL or base64 data")
+}
+
+func (s *ImageService) callChatGPTImageEditAPI(baseURL, apiKey, model string, req *GenerateImageRequest) (string, string, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	if err := writer.WriteField("model", model); err != nil {
+		return "", "", err
+	}
+	if err := writer.WriteField("prompt", req.Prompt); err != nil {
+		return "", "", err
+	}
+	if err := writer.WriteField("n", "1"); err != nil {
+		return "", "", err
+	}
+	if req.Size != "" {
+		if err := writer.WriteField("size", req.Size); err != nil {
+			return "", "", err
+		}
+	}
+	if req.Quality != "" {
+		if err := writer.WriteField("quality", req.Quality); err != nil {
+			return "", "", err
+		}
+	}
+	if req.Style != "" {
+		if err := writer.WriteField("style", req.Style); err != nil {
+			return "", "", err
+		}
+	}
+
+	referenceImages := req.ReferenceImages
+	if len(referenceImages) == 0 && len(req.ReferenceImageData) > 0 {
+		referenceImages = []ReferenceImage{{
+			Data:        req.ReferenceImageData,
+			Name:        req.ReferenceImageName,
+			ContentType: req.ReferenceImageType,
+		}}
+	}
+
+	for index, referenceImage := range referenceImages {
+		filename := referenceImage.Name
+		if filename == "" {
+			filename = fmt.Sprintf("reference-%d.png", index+1)
+		}
+
+		part, err := writer.CreateFormFile("image", filename)
+		if err != nil {
+			return "", "", err
+		}
+		if _, err := io.Copy(part, bytes.NewReader(referenceImage.Data)); err != nil {
+			return "", "", err
+		}
+	}
+
+	if err := writer.Close(); err != nil {
+		return "", "", err
+	}
+
+	httpReq, err := http.NewRequest("POST", baseURL+"/v1/images/edits", body)
+	if err != nil {
+		return "", "", err
+	}
+
+	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{Timeout: 330 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+
+	if resp.StatusCode != 200 {
+		return "", "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var apiResp ChatGPTImageResponse
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return "", "", err
+	}
+
+	if len(apiResp.Data) == 0 {
+		return "", "", errors.New("no image generated")
+	}
+
+	item := apiResp.Data[0]
+	if item.B64JSON != "" {
+		return "b64:" + item.B64JSON, item.RevisedPrompt, nil
+	}
 	if item.URL != "" {
 		return item.URL, item.RevisedPrompt, nil
 	}
@@ -291,4 +450,24 @@ func (s *ImageService) downloadAndSaveImage(imageURL string, userID int) (string
 
 	relativePath := filepath.Join(fmt.Sprintf("%d", userID), now.Format("2006"), now.Format("01"), filename)
 	return relativePath, nil
+}
+
+func (s *ImageService) LoadReferenceImage(localPath string) ([]byte, string, string, error) {
+	if strings.TrimSpace(localPath) == "" {
+		return nil, "", "", errors.New("empty local path")
+	}
+
+	absolutePath := filepath.Join(s.cfg.StoragePath, localPath)
+	data, err := os.ReadFile(absolutePath)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	filename := filepath.Base(localPath)
+	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(filename)))
+	if contentType == "" {
+		contentType = http.DetectContentType(data)
+	}
+
+	return data, filename, contentType, nil
 }

@@ -79,3 +79,37 @@ func (r *StatsRepository) GetStatsRange(userID int, startDate, endDate string) (
 	}
 	return statsList, nil
 }
+
+func (r *StatsRepository) GetSystemOverview() (*models.AdminOverview, error) {
+	overview := &models.AdminOverview{}
+
+	userQuery := `SELECT
+		COUNT(*) AS total_users,
+		COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) AS active_users,
+		COALESCE(SUM(CASE WHEN status != 'active' THEN 1 ELSE 0 END), 0) AS suspended_users
+	FROM users`
+	if err := database.DB.QueryRow(userQuery).Scan(
+		&overview.TotalUsers,
+		&overview.ActiveUsers,
+		&overview.SuspendedUsers,
+	); err != nil {
+		return nil, err
+	}
+
+	statsQuery := `SELECT
+		COALESCE(SUM(total_generations), 0),
+		COALESCE(SUM(successful_generations), 0),
+		COALESCE(SUM(failed_generations), 0),
+		COALESCE(SUM(total_credits_used), 0)
+	FROM usage_stats`
+	if err := database.DB.QueryRow(statsQuery).Scan(
+		&overview.TotalGenerations,
+		&overview.SuccessfulRuns,
+		&overview.FailedRuns,
+		&overview.TotalCreditsUsed,
+	); err != nil {
+		return nil, err
+	}
+
+	return overview, nil
+}

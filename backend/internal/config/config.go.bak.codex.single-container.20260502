@@ -11,7 +11,6 @@ type Config struct {
 	JWTSecret      string
 	EncryptionKey  string
 	StoragePath    string
-	FrontendPath   string
 	AllowedOrigins []string
 }
 
@@ -22,7 +21,6 @@ func Load() *Config {
 		JWTSecret:      getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
 		EncryptionKey:  getEnv("ENCRYPTION_KEY", "your-32-byte-encryption-key-here"),
 		StoragePath:    getEnv("STORAGE_PATH", "./storage/images"),
-		FrontendPath:   getEnv("FRONTEND_PATH", "./frontend"),
 		AllowedOrigins: getAllowedOrigins(),
 	}
 }
@@ -35,13 +33,7 @@ func getEnv(key, defaultValue string) string {
 }
 
 func getAllowedOrigins() []string {
-	value := getEnv(
-		"ALLOWED_ORIGINS",
-		getEnv(
-			"ALLOWED_ORIGIN",
-			"http://localhost:3000,http://localhost:8080,http://127.0.0.1:8080,http://47.109.108.57,http://lqbz.sheyice.com,https://lqbz.sheyice.com",
-		),
-	)
+	value := getEnv("ALLOWED_ORIGINS", getEnv("ALLOWED_ORIGIN", "http://localhost:3000,http://localhost:3001,http://localhost:3010"))
 	parts := strings.Split(value, ",")
 	origins := make([]string, 0, len(parts))
 
@@ -53,7 +45,7 @@ func getAllowedOrigins() []string {
 	}
 
 	if len(origins) == 0 {
-		return []string{"http://localhost:8080", "http://127.0.0.1:8080"}
+		return []string{"http://localhost:3000", "http://localhost:3001", "http://localhost:3010"}
 	}
 
 	return origins

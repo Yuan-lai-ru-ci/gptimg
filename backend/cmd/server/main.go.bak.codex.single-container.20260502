@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"os"
-	"path/filepath"
-
 	"gptimg/internal/api"
 	"gptimg/internal/config"
 	"gptimg/internal/database"
+	"log"
+	"os"
 )
 
 func main() {
@@ -18,7 +16,7 @@ func main() {
 		log.Fatalf("Failed to create storage directory: %v", err)
 	}
 
-	dbDir := filepath.Dir(cfg.DatabasePath)
+	dbDir := "./data"
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}

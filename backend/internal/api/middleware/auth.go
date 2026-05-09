@@ -1,15 +1,19 @@
 package middleware
 
 import (
+	"strings"
+
 	"gptimg/internal/config"
+	"gptimg/internal/repository"
 	"gptimg/internal/utils"
 	"gptimg/pkg/response"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
+	userRepo := repository.NewUserRepository()
+
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -32,9 +36,27 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("user_id", claims.UserID)
-		c.Set("username", claims.Username)
-		c.Set("role", claims.Role)
+		role := claims.Role
+		username := claims.Username
+
+		user, err := userRepo.FindByID(claims.UserID)
+		if err != nil {
+			response.Unauthorized(c, "Failed to load user")
+			c.Abort()
+			return
+		}
+		if user == nil || user.Status != "active" {
+			response.Unauthorized(c, "User not available")
+			c.Abort()
+			return
+		}
+
+		role = user.Role
+		username = user.Username
+
+		c.Set("user_id", user.ID)
+		c.Set("username", username)
+		c.Set("role", role)
 		c.Next()
 	}
 }

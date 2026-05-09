@@ -4,7 +4,10 @@ import (
 	"gptimg/internal/repository"
 	"gptimg/internal/services"
 	"gptimg/pkg/response"
+	"io"
+	"mime/multipart"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,9 +28,50 @@ func (h *ImageHandler) Generate(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 
 	var req services.GenerateImageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
-		return
+	if strings.Contains(c.GetHeader("Content-Type"), "multipart/form-data") {
+		if err := c.ShouldBind(&req); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+
+		form, err := c.MultipartForm()
+		if err == nil && form != nil {
+			fileHeaders := append([]*multipart.FileHeader{}, form.File["reference_image"]...)
+			fileHeaders = append(fileHeaders, form.File["reference_images"]...)
+
+			for _, fileHeader := range fileHeaders {
+				file, err := fileHeader.Open()
+				if err != nil {
+					response.BadRequest(c, "Failed to read reference image")
+					return
+				}
+
+				data, err := io.ReadAll(file)
+				file.Close()
+				if err != nil {
+					response.BadRequest(c, "Failed to read reference image")
+					return
+				}
+
+				referenceImage := services.ReferenceImage{
+					Data:        data,
+					Name:        fileHeader.Filename,
+					ContentType: fileHeader.Header.Get("Content-Type"),
+				}
+				req.ReferenceImages = append(req.ReferenceImages, referenceImage)
+			}
+
+			if len(req.ReferenceImages) > 0 {
+				req.ReferenceImageData = req.ReferenceImages[0].Data
+				req.ReferenceImageName = req.ReferenceImages[0].Name
+				req.ReferenceImageType = req.ReferenceImages[0].ContentType
+			}
+		}
+	} else {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
 	}
 
 	record, err := h.imageService.GenerateImage(userID.(int), &req)

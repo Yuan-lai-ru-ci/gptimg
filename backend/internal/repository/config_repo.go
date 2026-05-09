@@ -62,6 +62,32 @@ func (r *ConfigRepository) FindActive() (*models.APIConfig, error) {
 	return config, err
 }
 
+func (r *ConfigRepository) FindActiveConfigs() ([]*models.APIConfig, error) {
+	query := `SELECT id, user_id, config_name, api_key_encrypted, api_base_url, model,
+			  is_active, max_requests_per_minute, created_at, updated_at
+			  FROM api_configs WHERE is_active = 1 ORDER BY created_at DESC`
+	rows, err := database.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var configs []*models.APIConfig
+	for rows.Next() {
+		config := &models.APIConfig{}
+		err := rows.Scan(
+			&config.ID, &config.UserID, &config.ConfigName, &config.APIKeyEncrypted,
+			&config.APIBaseURL, &config.Model, &config.IsActive, &config.MaxRequestsPerMinute,
+			&config.CreatedAt, &config.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		configs = append(configs, config)
+	}
+	return configs, nil
+}
+
 func (r *ConfigRepository) FindAll() ([]*models.APIConfig, error) {
 	query := `SELECT id, user_id, config_name, api_key_encrypted, api_base_url, model,
 			  is_active, max_requests_per_minute, created_at, updated_at

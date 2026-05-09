@@ -25,7 +25,7 @@ func NewConfigHandler(configRepo *repository.ConfigRepository, cfg *config.Confi
 
 type CreateConfigRequest struct {
 	ConfigName           string `json:"config_name" binding:"required"`
-	APIKey               string `json:"api_key" binding:"required"`
+	APIKey               string `json:"api_key"`
 	APIBaseURL           string `json:"api_base_url"`
 	Model                string `json:"model"`
 	IsActive             bool   `json:"is_active"`
@@ -38,6 +38,10 @@ func (h *ConfigHandler) Create(c *gin.Context) {
 	var req CreateConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
+		return
+	}
+	if req.APIKey == "" {
+		response.BadRequest(c, "API key is required")
 		return
 	}
 
@@ -105,18 +109,24 @@ func (h *ConfigHandler) Update(c *gin.Context) {
 		return
 	}
 
-	encryptedKey, err := utils.EncryptAPIKey(req.APIKey, h.cfg.EncryptionKey)
-	if err != nil {
-		response.InternalError(c, "Failed to encrypt API key")
-		return
+	if req.APIKey != "" {
+		encryptedKey, err := utils.EncryptAPIKey(req.APIKey, h.cfg.EncryptionKey)
+		if err != nil {
+			response.InternalError(c, "Failed to encrypt API key")
+			return
+		}
+		config.APIKeyEncrypted = encryptedKey
 	}
 
 	config.ConfigName = req.ConfigName
-	config.APIKeyEncrypted = encryptedKey
 	config.APIBaseURL = req.APIBaseURL
-	config.Model = req.Model
+	if req.Model != "" {
+		config.Model = req.Model
+	}
 	config.IsActive = req.IsActive
-	config.MaxRequestsPerMinute = req.MaxRequestsPerMinute
+	if req.MaxRequestsPerMinute > 0 {
+		config.MaxRequestsPerMinute = req.MaxRequestsPerMinute
+	}
 
 	if err := h.configRepo.Update(config); err != nil {
 		response.InternalError(c, "Failed to update config")

@@ -34,6 +34,10 @@ type CreateSessionRequest struct {
 	Title string `json:"title"`
 }
 
+type UpdateSessionRequest struct {
+	Title string `json:"title"`
+}
+
 func (h *SessionHandler) Create(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 
@@ -137,4 +141,33 @@ func (h *SessionHandler) Delete(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"message": "Session deleted successfully"})
+}
+
+func (h *SessionHandler) Update(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	sessionID := c.Param("id")
+
+	session, err := h.sessionRepo.FindByID(sessionID)
+	if err != nil {
+		response.InternalError(c, "Database error")
+		return
+	}
+	if session == nil || session.UserID != userID.(int) {
+		response.Forbidden(c, "Access denied")
+		return
+	}
+
+	var req UpdateSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	session.Title = req.Title
+	if err := h.sessionRepo.Update(session); err != nil {
+		response.InternalError(c, "Failed to update session")
+		return
+	}
+
+	response.Success(c, session)
 }
