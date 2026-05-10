@@ -4,6 +4,7 @@ WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm config set registry https://registry.npmmirror.com && npm install
 COPY frontend/ ./
+ENV NEXT_PUBLIC_BASE_PATH=/gptimg
 RUN npm run build
 
 FROM golang:1.25-alpine AS backend-builder
