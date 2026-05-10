@@ -1,0 +1,91 @@
+{
+  "test_time": "2026-05-09 20:05:44",
+  "model": "gpt-image-2",
+  "base_url": "https://as-image.clawnode.cn",
+  "size": "1792x1024",
+  "prompts": [
+    "A white cat wearing a red knitted scarf, sitting in a snowy forest. The cat has bright green eyes and a small black spot on its left ear. Illustration style, soft lighting.",
+    "The same cat from before, now sitting on a cozy brown leather sofa in a warm living room with a fireplace. Same illustration style.",
+    "A cat sitting on a cozy brown leather sofa in a warm living room with a fireplace. Illustration style, soft lighting."
+  ],
+  "responses": [
+    {
+      "created": 1778328096,
+      "data": [
+        {
+          "b64_json": "[BASE64_DATA, 4256856 chars]",
+          "revised_prompt": "Illustration style scene of a white cat sitting in a snowy forest, wearing a red knitted scarf. The cat has bright green eyes and a small black spot on its left ear. Soft lighting, gentle winter atmosphere, detailed fur, serene composition, pastel-like illustration, crisp snowy background with pine trees."
+        }
+      ],
+      "background": "opaque",
+      "output_format": "png",
+      "quality": "medium",
+      "size": "1792x1024",
+      "usage": {
+        "input_tokens": 66,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 66
+        },
+        "output_tokens": 1243,
+        "output_tokens_details": {
+          "image_tokens": 1243,
+          "text_tokens": 0
+        },
+        "total_tokens": 1309
+      }
+    },
+    {
+      "created": 1778328148,
+      "data": [
+        {
+          "b64_json": "[BASE64_DATA, 3640204 chars]",
+          "revised_prompt": "Illustration of the same cat from before, sitting on a cozy brown leather sofa in a warm living room with a fireplace. Preserve the same illustration style as before: charming, clean, consistent character design, soft warm lighting, inviting home atmosphere. The cat is relaxed and centered in the scene, with the fireplace softly glowing in the background, tasteful living room details, rich brown leather texture on the sofa, cozy blankets and subtle decor. High-quality illustrated scene, cohesive composition."
+        }
+      ],
+      "background": "opaque",
+      "output_format": "png",
+      "quality": "medium",
+      "size": "1792x1024",
+      "usage": {
+        "input_tokens": 101,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 101
+        },
+        "output_tokens": 1243,
+        "output_tokens_details": {
+          "image_tokens": 1243,
+          "text_tokens": 0
+        },
+        "total_tokens": 1344
+      }
+    },
+    {
+      "created": 1778328215,
+      "data": [
+        {
+          "b64_json": "[BASE64_DATA, 3589940 chars]",
+          "revised_prompt": "An illustration-style scene of a cat sitting on a cozy brown leather sofa in a warm living room with a glowing fireplace. Soft lighting, inviting atmosphere, gentle shadows, detailed interior decor, comfortable home setting, painterly illustration, warm color palette."
+        }
+      ],
+      "background": "opaque",
+      "output_format": "png",
+      "quality": "medium",
+      "size": "1792x1024",
+      "usage": {
+        "input_tokens": 55,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 55
+        },
+        "output_tokens": 1243,
+        "output_tokens_details": {
+          "image_tokens": 1243,
+          "text_tokens": 0
+        },
+        "total_tokens": 1298
+      }
+    }
+  ]
+}

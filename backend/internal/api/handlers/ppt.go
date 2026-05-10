@@ -371,48 +371,7 @@ func buildSlideImagePrompt(
 		return strings.TrimSpace(slide.Objective)
 	}
 
-	continuityNote := buildContinuityNote(slides, index, slide, masterRecord)
-	pageDescription := strings.TrimSpace(slide.PageDescription)
-	if pageDescription == "" {
-		pageDescription = fmt.Sprintf(
-			"这一页是：内容页\n标题是：%s\n核心内容是：%s",
-			slide.Title,
-			slide.Objective,
-		)
-	}
-	masterStyleDescription := strings.TrimSpace(req.MasterStyleDescription)
-	if masterStyleDescription == "" {
-		masterStyleDescription = fmt.Sprintf(
-			"%s Maintain these rules: %s",
-			req.VisualDirection,
-			strings.Join(req.ConsistencyRules, "; "),
-		)
-	}
-
-	pageType := "内容页"
-	if index == 0 {
-		pageType = "封面页"
-	} else if index == len(slides)-1 {
-		pageType = "结尾页"
-	} else if slide.SlideNumber == 2 {
-		pageType = "第一页内容页"
-	}
-
-	return fmt.Sprintf(
-		"请生成一张中文PPT页面。\n当前页号：%d / %d\n生成模式：%s\n这一页是：%s\n标题是：%s\n核心内容是：%s\n补充说明：%s\n整套主题：%s\n整体风格倾向：%s\n风格保持：%s\n统一要求：%s\n连续性要求：%s\n严禁串页：只生成当前页号对应的内容，不要引用、合并、延续其他页的标题、图片说明或提示词内容。\n额外提示：直接生成好看的成品页，文字清晰可读，整体统一；模式①下不要替用户新增实质内容，只把用户文字按参考图风格排成PPT。",
-		slide.SlideNumber,
-		len(slides),
-		buildGenerationModeInstruction(req.GenerationMode),
-		pageType,
-		slide.Title,
-		slide.Objective,
-		pageDescription,
-		req.DeckTitle,
-		req.VisualDirection,
-		masterStyleDescription,
-		strings.Join(req.ConsistencyRules, "；"),
-		continuityNote,
-	)
+	return services.BuildCompetitionSlidePrompt(req, slides, index, slide)
 }
 
 func buildGenerationModeInstruction(mode string) string {
